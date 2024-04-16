@@ -16,9 +16,9 @@
 ;; - Show current compilation status BLOCKED (I don't think that
 ;;    information is even stored?)
 ;; - Fix project menu showing up in buffer list when hitting c-x p c-b
-;;    (list buffers) (might not be possible?)
+;;    (list buffers) (might not be possible?) 
 ;; - Also fix project menu showing up in buffer list when hitting g in
-;;    buffer list
+;;    buffer list DONE
 ;; - Improve performance of project buffer counts (n = number of buffers,
 ;;    p = number of projects. Currently O(np), should be O(n))
 ;;    Hmmm but actually it's not that simple, because you could maybe
@@ -30,6 +30,8 @@
 ;;    Ignore nested projects: things are associated with the project
 ;;    with the longest common prefix
 ;; - Support arbitrary list of projects DONE
+;; - Modify project.el to exclude the *Projects* buffer when listing
+;;    buffers in a project
 
 ;; List projects keybinding C-x p l
 
@@ -204,8 +206,6 @@ Used for the \"Buffers\" column"
   :interactive nil
   ;; Set the default directory to whatever is at point
   (add-hook 'pre-command-hook 'project-menu--set-default-directory nil t)
-  (let ((buf (current-buffer)))
-    (add-hook 'post-command-hook (lambda () (project-menu--unset-default-directory buf)) nil t))
   (setq tabulated-list-format
         `[("Project" ,project-name-column-width t)
           ("Root" ,project-root-column-width t)
@@ -215,18 +215,26 @@ Used for the \"Buffers\" column"
   (tabulated-list-init-header)
   (add-hook 'tabulated-list-revert-hook 'project-menu--refresh-contents nil t))
 
+(defvar current-project-menu-buf nil)
+(defvar-local current-project-menu-default-dir nil)
+
+(defun project-menu--unset-default-directory ()
+  "Sets the default directory to NOTHING."
+  (with-current-buffer current-project-menu-buf
+    (setq default-directory current-project-menu-default-dir))
+  ;; Remove this hook so it doesn't run repeatedly
+  (remove-hook 'post-command-hook #'project-menu--unset-default-directory))
+
 (defun project-menu--set-default-directory ()
   "Sets the default directory to the root of the project for the row
 currently at point, so that any commands are relative to this project"
   ;; Get the project our point is currently on
-  (let ((proj (tabulated-list-get-id)))
+  (when-let ((proj (tabulated-list-get-id)))
     ;; Set default-directory to that root
-    (when proj (setq default-directory (project-root proj)))))
-
-(defun project-menu--unset-default-directory (buf)
-  "Sets the default directory to NOTHING."
-  (with-current-buffer buf
-    (setq default-directory nil)))
+    (setq current-project-menu-default-dir default-directory)
+    (setq current-project-menu-buf (current-buffer))
+    (setq default-directory (project-root proj))
+    (add-hook 'post-command-hook #'project-menu--unset-default-directory)))
 
 (defun list-projects ()
   "Create a project menu buffer"
@@ -250,13 +258,6 @@ a list of projects; it means list those projects and no others."
   
   
     
-
-;; What about just a sorted list of project roots? Then you could
-;; do maybe a binary search on them? But, hm, that doesn't really
-;; fix the nesting problem, unless you also have a way of jumping
-;; from a child project to its parent. Then we find the rightmost
-;; root, make sure it's a prefix and wait no that doesn't work...
-;; 
 
 ;; (list-projects)
 (pop-to-buffer-same-window (list-projects-noselect (lambda ()
