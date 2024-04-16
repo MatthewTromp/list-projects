@@ -260,5 +260,6 @@ a list of projects; it means list those projects and no others."
     
 
 ;; (list-projects)
-(pop-to-buffer-same-window (list-projects-noselect (lambda ()
-                                                     (seq-filter (lambda (proj) (string-prefix-p "~/cryptopals/" (project-root proj))) (project-known-projects)))))
+;; (pop-to-buffer-same-window (list-projects-noselect (lambda ()
+;;                                                      (seq-filter (lambda (proj) (string-prefix-p "~/cryptopals/" (project-root proj))) (project-known-project
+                                                                                                                                        s)))))
