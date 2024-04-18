@@ -9,14 +9,14 @@
 ;; - Have point stay on whatever we're currently on after a refresh DONE
 ;; - Fix project menu showing up in buffer list for given project DONE
 ;; - Correct project buffer count  DONE
-;; - Also fix project menu counting towards buffer count for the 
+;; - Also fix project menu counting towards buffer count for the
 ;;    project point is currently on when we revert DONE
 ;; - Have other buffer open in different window and have point
 ;;    automatically switch to that window for all things DONE
 ;; - Show current compilation status BLOCKED (I don't think that
 ;;    information is even stored?)
 ;; - Fix project menu showing up in buffer list when hitting c-x p c-b
-;;    (list buffers) (might not be possible?) 
+;;    (list buffers) (might not be possible?)
 ;; - Also fix project menu showing up in buffer list when hitting g in
 ;;    buffer list DONE
 ;; - Improve performance of project buffer counts (n = number of buffers,
@@ -109,7 +109,7 @@ Opens the project's root directory in 'dired'."
   (interactive nil project-menu-mode)
   (let ((proj (button-get button 'project)))
     (pop-to-buffer (dired-noselect (project-root proj)))))
-    
+
 (defun project-menu--list-buffers (button)
   (interactive nil project-menu-mode)
   (let* ((proj (button-get button 'project))
@@ -146,7 +146,7 @@ Used for the \"Buffers\" column"
           `[
             ;; First column: project name
             ;; Links to dired of project root
-            (,(project-name proj) 
+            (,(project-name proj)
              face project-name
              font-lock-face project-name
              follow-link t
@@ -196,8 +196,8 @@ Used for the \"Buffers\" column"
     (setq tabulated-list-entries
           (mapcar #'project-menu--print-info-simple projects)))
   (tabulated-list-print t))
-  
-(define-derived-mode project-menu-mode tabulated-list-mode "Project menu" 
+
+(define-derived-mode project-menu-mode tabulated-list-mode "Project menu"
   :interactive nil
   ;; Set the default directory to whatever is at point
   (add-hook 'pre-command-hook 'project-menu--set-default-directory nil t)
@@ -252,11 +252,11 @@ a list of projects; it means list those projects and no others."
               #'project-known-projects))
       (project-menu--refresh-contents))
     buf))
-  
-  
-    
+
+
+
 
 ;; (list-projects)
 ;; (pop-to-buffer-same-window (list-projects-noselect (lambda ()
 ;;                                                      (seq-filter (lambda (proj) (string-prefix-p "~/cryptopals/" (project-root proj))) (project-known-project
-                                                                                                                                        s)))))
+;;                                                                                                                                         s)))))
