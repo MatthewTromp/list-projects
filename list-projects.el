@@ -77,13 +77,6 @@
 
 (defvar-local project-menu-refresh-fun nil
   "The function to return a list of projects.")
-  
-
-(defun project-menu--name-predicate (A B)
-  "Predicate to sort \"*Projects*\" buffer by project name.
-This is used for 'tabulated-list-format' in 'project-menu-mode'."
-  (string< (project-name (car A))
-           (project-name (car B))))
 
 (defun project-menu--get-buffer-count (A)
   "Extracts the buffer count for the row and returns as an integer (-1
@@ -96,9 +89,11 @@ This is used for 'tabulated-list-format' in 'project-menu-mode'."
   (let ((dA (string-to-number (car (aref (cadr A) 2))))
         (dB (string-to-number (car (aref (cadr B) 2)))))
     (if (= dA dB)
-        (project-menu--name-predicate A B)
+        (let ((name-A (car (aref (cadr A) 0)))
+              (name-B (car (aref (cadr B) 0))))
+          (string< name-A name-B))
       (< dA dB))))
-    
+
 (defun project--ensure-project-menu-mode ()
   "Signal a user-error if major mode is not `project-menu-mode'."
   (unless (derived-mode-p 'project-menu-mode)
