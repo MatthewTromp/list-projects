@@ -210,26 +210,28 @@ Used for the \"Buffers\" column"
   (tabulated-list-init-header)
   (add-hook 'tabulated-list-revert-hook 'project-menu--refresh-contents nil t))
 
-(defvar current-project-menu-buf nil)
-(defvar-local current-project-menu-default-dir nil)
+(defvar-local project-menu--old-default-directory nil
+  "The original `default-directory' before `project-menu--set-default-directory'.
 
-(defun project-menu--unset-default-directory ()
-  "Sets the default directory to NOTHING."
-  (with-current-buffer current-project-menu-buf
-    (setq default-directory current-project-menu-default-dir))
-  ;; Remove this hook so it doesn't run repeatedly
-  (remove-hook 'post-command-hook #'project-menu--unset-default-directory))
+If this is non-nil, it indicates that
+`project-menu--set-default-directory' has set
+`default-directory'; it will set `default-directory' back to this
+if there's no project at point.")
 
 (defun project-menu--set-default-directory ()
   "Sets the default directory to the root of the project for the row
 currently at point, so that any commands are relative to this project"
   ;; Get the project our point is currently on
-  (when-let ((proj (tabulated-list-get-id)))
-    ;; Set default-directory to that root
-    (setq current-project-menu-default-dir default-directory)
-    (setq current-project-menu-buf (current-buffer))
-    (setq default-directory (project-root proj))
-    (add-hook 'post-command-hook #'project-menu--unset-default-directory)))
+  (if-let ((proj (tabulated-list-get-id)))
+      ;; Set default-directory to that root
+      (progn
+        (unless project-menu--old-default-directory
+          (setq project-menu--old-default-directory default-directory))
+        (setq default-directory (file-name-as-directory (project-root proj))))
+    ;; If there's no project at point, reset back to the original default-directory
+    (when project-menu--old-default-directory
+      (setq default-directory project-menu--old-default-directory)
+      (setq project-menu--old-default-directory nil))))
 
 (defun list-projects ()
   "Create a project menu buffer"
