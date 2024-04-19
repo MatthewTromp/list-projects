@@ -9,14 +9,14 @@
 ;; - Have point stay on whatever we're currently on after a refresh DONE
 ;; - Fix project menu showing up in buffer list for given project DONE
 ;; - Correct project buffer count  DONE
-;; - Also fix project menu counting towards buffer count for the 
+;; - Also fix project menu counting towards buffer count for the
 ;;    project point is currently on when we revert DONE
 ;; - Have other buffer open in different window and have point
 ;;    automatically switch to that window for all things DONE
 ;; - Show current compilation status BLOCKED (I don't think that
 ;;    information is even stored?)
 ;; - Fix project menu showing up in buffer list when hitting c-x p c-b
-;;    (list buffers) (might not be possible?) 
+;;    (list buffers) (might not be possible?)
 ;; - Also fix project menu showing up in buffer list when hitting g in
 ;;    buffer list DONE
 ;; - Improve performance of project buffer counts (n = number of buffers,
@@ -77,13 +77,6 @@
 
 (defvar-local project-menu-refresh-fun nil
   "The function to return a list of projects.")
-  
-
-(defun project-menu--name-predicate (A B)
-  "Predicate to sort \"*Projects*\" buffer by project name.
-This is used for 'tabulated-list-format' in 'project-menu-mode'."
-  (string< (project-name (car A))
-           (project-name (car B))))
 
 (defun project-menu--get-buffer-count (A)
   "Extracts the buffer count for the row and returns as an integer (-1
@@ -96,9 +89,11 @@ This is used for 'tabulated-list-format' in 'project-menu-mode'."
   (let ((dA (string-to-number (car (aref (cadr A) 2))))
         (dB (string-to-number (car (aref (cadr B) 2)))))
     (if (= dA dB)
-        (project-menu--name-predicate A B)
+        (let ((name-A (car (aref (cadr A) 0)))
+              (name-B (car (aref (cadr B) 0))))
+          (string< name-A name-B))
       (< dA dB))))
-    
+
 (defun project--ensure-project-menu-mode ()
   "Signal a user-error if major mode is not `project-menu-mode'."
   (unless (derived-mode-p 'project-menu-mode)
@@ -114,7 +109,7 @@ Opens the project's root directory in 'dired'."
   (interactive nil project-menu-mode)
   (let ((proj (button-get button 'project)))
     (pop-to-buffer (dired-noselect (project-root proj)))))
-    
+
 (defun project-menu--list-buffers (button)
   (interactive nil project-menu-mode)
   (let* ((proj (button-get button 'project))
@@ -151,7 +146,7 @@ Used for the \"Buffers\" column"
           `[
             ;; First column: project name
             ;; Links to dired of project root
-            (,(project-name proj) 
+            (,(project-name proj)
              face project-name
              font-lock-face project-name
              follow-link t
@@ -201,8 +196,8 @@ Used for the \"Buffers\" column"
     (setq tabulated-list-entries
           (mapcar #'project-menu--print-info-simple projects)))
   (tabulated-list-print t))
-  
-(define-derived-mode project-menu-mode tabulated-list-mode "Project menu" 
+
+(define-derived-mode project-menu-mode tabulated-list-mode "Project menu"
   :interactive nil
   ;; Set the default directory to whatever is at point
   (add-hook 'pre-command-hook 'project-menu--set-default-directory nil t)
@@ -215,26 +210,28 @@ Used for the \"Buffers\" column"
   (tabulated-list-init-header)
   (add-hook 'tabulated-list-revert-hook 'project-menu--refresh-contents nil t))
 
-(defvar current-project-menu-buf nil)
-(defvar-local current-project-menu-default-dir nil)
+(defvar-local project-menu--old-default-directory nil
+  "The original `default-directory' before `project-menu--set-default-directory'.
 
-(defun project-menu--unset-default-directory ()
-  "Sets the default directory to NOTHING."
-  (with-current-buffer current-project-menu-buf
-    (setq default-directory current-project-menu-default-dir))
-  ;; Remove this hook so it doesn't run repeatedly
-  (remove-hook 'post-command-hook #'project-menu--unset-default-directory))
+If this is non-nil, it indicates that
+`project-menu--set-default-directory' has set
+`default-directory'; it will set `default-directory' back to this
+if there's no project at point.")
 
 (defun project-menu--set-default-directory ()
   "Sets the default directory to the root of the project for the row
 currently at point, so that any commands are relative to this project"
   ;; Get the project our point is currently on
-  (when-let ((proj (tabulated-list-get-id)))
-    ;; Set default-directory to that root
-    (setq current-project-menu-default-dir default-directory)
-    (setq current-project-menu-buf (current-buffer))
-    (setq default-directory (project-root proj))
-    (add-hook 'post-command-hook #'project-menu--unset-default-directory)))
+  (if-let ((proj (tabulated-list-get-id)))
+      ;; Set default-directory to that root
+      (progn
+        (unless project-menu--old-default-directory
+          (setq project-menu--old-default-directory default-directory))
+        (setq default-directory (file-name-as-directory (project-root proj))))
+    ;; If there's no project at point, reset back to the original default-directory
+    (when project-menu--old-default-directory
+      (setq default-directory project-menu--old-default-directory)
+      (setq project-menu--old-default-directory nil))))
 
 (defun list-projects ()
   "Create a project menu buffer"
@@ -255,11 +252,11 @@ a list of projects; it means list those projects and no others."
               #'project-known-projects))
       (project-menu--refresh-contents))
     buf))
-  
-  
-    
+
+
+
 
 ;; (list-projects)
 ;; (pop-to-buffer-same-window (list-projects-noselect (lambda ()
 ;;                                                      (seq-filter (lambda (proj) (string-prefix-p "~/cryptopals/" (project-root proj))) (project-known-project
-                                                                                                                                        s)))))
+;;                                                                                                                                         s)))))
