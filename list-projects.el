@@ -78,11 +78,6 @@
 (defvar-local project-menu-refresh-fun nil
   "The function to return a list of projects.")
 
-(defun project-menu--get-buffer-count (A)
-  "Extracts the buffer count for the row and returns as an integer (-1
-if there are no projects."
-  (let ((bufstr (car (aref (cadr A) 2))))))
-
 (defun project-menu--buffer-predicate (A B)
   "Predicate to sort \"*Projects*\" buffer by number of project buffers.
 This is used for 'tabulated-list-format' in 'project-menu-mode'."
@@ -105,12 +100,12 @@ This is used for 'tabulated-list-format' in 'project-menu-mode'."
 
 (defun project-menu-jump-to-project (button)
   "Triggered when clicking/reting on a project name.
-Opens the project's root directory in 'dired'."
-  (interactive nil project-menu-mode)
+Opens the project's root directory in 'Dired'."
   (let ((proj (button-get button 'project)))
     (pop-to-buffer (dired-noselect (project-root proj)))))
 
 (defun project-menu--list-buffers (button)
+  "Lists buffers for the project on the current row."
   (interactive nil project-menu-mode)
   (let* ((proj (button-get button 'project))
          (project-current-directory-override (project-root proj))
@@ -234,7 +229,7 @@ currently at point, so that any commands are relative to this project"
       (setq project-menu--old-default-directory nil))))
 
 (defun list-projects ()
-  "Create a project menu buffer"
+  "Create a project menu buffer."
   (interactive)
   (pop-to-buffer-same-window (list-projects-noselect)))
 
@@ -253,10 +248,5 @@ a list of projects; it means list those projects and no others."
       (project-menu--refresh-contents))
     buf))
 
-
-
-
-;; (list-projects)
-;; (pop-to-buffer-same-window (list-projects-noselect (lambda ()
-;;                                                      (seq-filter (lambda (proj) (string-prefix-p "~/cryptopals/" (project-root proj))) (project-known-project
-;;                                                                                                                                         s)))))
+(provide 'list-projects)
+;;; list-projects.el ends here
