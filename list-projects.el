@@ -35,6 +35,9 @@
 
 ;; List projects keybinding C-x p l
 
+;;; Code:
+(require 'project)
+
 (defface project-name
   '((t :inherit link))
   "Face used on project names in the project menu."
@@ -125,16 +128,70 @@ project's root directory"
         (magit-status (project-root proj))
       (vc-dir (project-root proj)))))
 
-(defun project-menu--print-info-simple (proj)
-  "Gets the number of open buffers for the given project
-Used for the \"Buffers\" column"
+;; Trie implementation for fast project-buffer lookups
+(defun project-build-trie (projects)
+  "Build a trie from PROJECTS for fast prefix matching using hash tables."
+  (let ((trie (make-hash-table :test 'equal)))
+    (dolist (proj projects)
+      (let* ((project-root (expand-file-name (project-root proj)))
+             ;; Ensure the path ends with a slash
+             (normalized-root (file-name-as-directory project-root))
+             (path-components (split-string normalized-root "/" t))
+             (current-node trie))
+        ;; Insert the project path into the trie
+        (dolist (component path-components)
+          (let ((next-node (gethash component current-node)))
+            (unless next-node
+              (setq next-node (make-hash-table :test 'equal))
+              (puthash component next-node current-node))
+            (setq current-node next-node)))
+        ;; Mark the end of a project path with the project object
+        (puthash :project proj current-node)))
+    trie))
+
+(defun project-for-buffer (buffer trie)
+  "Find project for BUFFER using TRIE-based prefix matching."
+  (let* ((buffer-dir (with-current-buffer buffer 
+                       (expand-file-name default-directory)))
+         ;; Ensure the path ends with a slash
+         (normalized-dir (file-name-as-directory buffer-dir))
+         (path-components (split-string normalized-dir "/" t))
+         (current-node trie)
+         (matched-project nil))
+    ;; Traverse the trie to find the longest matching prefix
+    (dolist (component path-components)
+      (let ((next-node (gethash component current-node)))
+        (when next-node
+          (setq current-node next-node)
+          (let ((project-marker (gethash :project current-node)))
+            (when project-marker
+              (setq matched-project project-marker))))))
+    matched-project))
+
+(defun group-buffers-by-project (projects)
+  "Group all buffers by their PROJECTS using the trie-based lookup.
+Returns a hash table mapping projects to lists of buffers."
+  (let ((trie (project-build-trie projects))
+        (project-buffers (make-hash-table :test 'equal)))
+    ;; Assign buffers to projects
+    (dolist (buffer (buffer-list))
+      (let ((project (project-for-buffer buffer trie)))
+        (when project
+          (puthash project 
+                   (cons buffer (gethash project project-buffers nil))
+                   project-buffers))))
+    project-buffers))
+
+;; Modified function to use the precomputed buffer assignments
+(defun project-menu--print-info-simple (proj buffer-map)
+  "Gets info for PROJ using BUFFER-MAP of precomputed buffer assignments."
   (let* ((buffers (seq-filter
                    (lambda (buf)
                      (let ((name (buffer-name buf)))
                        (not (or
                              (equal name "*Projects*")
                              (string= (substring name 0 1) " ")))))
-                   (project-buffers proj)))
+                   (gethash proj buffer-map nil)))
          (num-buffers (length buffers))
          (vc (project-try-vc (project-root proj))))
     (list proj
@@ -176,21 +233,26 @@ Used for the \"Buffers\" column"
                  face project-vc
                  font-lock-face project-vc))])))
 
+;; Modified refresh function to use the optimized buffer assignment
+(defun project-menu--refresh ()
+  "Populates the project menu with all known projects."
+  (let* ((projects (funcall project-menu-refresh-fun))
+         (buffer-map (group-buffers-by-project projects)))
+    (setq tabulated-list-entries
+          (mapcar (lambda (proj) 
+                    (project-menu--print-info-simple proj buffer-map))
+                  projects)))
+  (tabulated-list-print t))
+
+
 (defun project-known-projects ()
-  "Returns all known projects as project objects."
+  "Return all known projects as project objects."
   (let ((proj-roots (delete-dups (mapcar #'expand-file-name (project-known-project-roots)))))
     ;; Get project object for each of these roots
     (mapcan (lambda (d) (let ((p (project--find-in-directory d)))
                           ;; Exclude non-existant projects
                           (if p (list p) nil)))
             proj-roots)))
-
-(defun project-menu--refresh ()
-  "Populates the project menu with all known projects."
-  (let ((projects (funcall project-menu-refresh-fun)))
-    (setq tabulated-list-entries
-          (mapcar #'project-menu--print-info-simple projects)))
-  (tabulated-list-print t))
 
 (define-derived-mode project-menu-mode tabulated-list-mode "Project menu"
   :interactive nil
@@ -250,3 +312,102 @@ a list of projects; it means list those projects and no others."
 
 (provide 'list-projects)
 ;;; list-projects.el ends here
+
+
+(require 'benchmark)
+(require 'cl-lib)
+
+(defun generate-test-projects (n-projects)
+  "Generate N-PROJECTS test project objects."
+  (cl-loop for i from 1 to n-projects
+           collect (let ((project-root (format "/home/user/projects/project-%03d" i)))
+                     (cons 'transient project-root))))
+
+(defun generate-test-buffers (n-buffers projects)
+  "Generate N-BUFFERS test buffers distributed among PROJECTS."
+  (let* ((n-projects (length projects))
+         (buffers '()))
+    (dotimes (i n-buffers)
+      ;; Choose a random project
+      (let* ((project-idx (random n-projects))
+             (project (nth project-idx projects))
+             (project-root (cdr project))
+             ;; Create a buffer with default-directory in the project
+             (subdir (format "%s/src/module-%d" project-root (random 5)))
+             (buffer-name (format "buffer-%04d.el" i))
+             (buffer (generate-new-buffer buffer-name)))
+        ;; Set the buffer's default-directory
+        (with-current-buffer buffer
+          (setq default-directory (file-name-as-directory subdir)))
+        (push buffer buffers)))
+    buffers))
+
+(defun original-assign-buffers-to-projects (projects buffers)
+  "Assign BUFFERS to PROJECTS using the original O(N*P) algorithm."
+  (let ((project-buffers (make-hash-table :test 'equal)))
+    (dolist (buffer buffers)
+      (let ((buffer-dir (with-current-buffer buffer default-directory))
+            (matched-project nil))
+        ;; For each buffer, check all projects to find a match
+        (dolist (proj projects)
+          (let ((project-root (file-name-as-directory 
+                               (expand-file-name (cdr proj)))))
+            (when (string-prefix-p project-root buffer-dir)
+              (setq matched-project proj))))
+        (when matched-project
+          (puthash matched-project 
+                   (cons buffer (gethash matched-project project-buffers nil))
+                   project-buffers))))
+    project-buffers))
+
+(defun benchmark-project-buffer-assignment ()
+  "Benchmark the original vs trie-based project-buffer assignment algorithms."
+  (interactive)
+  ;; Generate test data
+  (let* ((n-projects 100)
+         (n-buffers 1000)
+         (projects (generate-test-projects n-projects))
+         (buffers (generate-test-buffers n-buffers projects))
+         (gc-cons-threshold most-positive-fixnum) ;; Prevent GC during benchmark
+         original-result
+         trie-result)
+    
+    (message "Starting benchmark with %d projects and %d buffers..." n-projects n-buffers)
+    
+    ;; Benchmark the original algorithm
+    (message "Benchmarking original algorithm...")
+    (let ((original-time
+           (benchmark-run 10
+             (setq original-result (original-assign-buffers-to-projects projects buffers)))))
+      (message "Original algorithm: %.6f seconds average (%.6f seconds total for 10 runs)"
+               (/ (car original-time) 10.0) (car original-time)))
+    
+    ;; Benchmark our trie-based algorithm
+    (message "Benchmarking trie-based algorithm...")
+    (let ((trie-time
+           (benchmark-run 10
+             (let ((trie (project-build-trie projects)))
+               (setq trie-result (make-hash-table :test 'equal))
+               (dolist (buffer buffers)
+                 (let ((project (project-for-buffer buffer trie)))
+                   (when project
+                     (puthash project 
+                              (cons buffer (gethash project trie-result nil))
+                              trie-result))))))))
+      (message "Trie-based algorithm: %.6f seconds average (%.6f seconds total for 10 runs)"
+               (/ (car trie-time) 10.0) (car trie-time)))
+    
+    ;; Check that the results are equivalent
+    (let ((original-count 0)
+          (trie-count 0))
+      (maphash (lambda (_k v) (cl-incf original-count (length v))) original-result)
+      (maphash (lambda (_k v) (cl-incf trie-count (length v))) trie-result)
+      (message "Original algorithm assigned %d buffers to projects" original-count)
+      (message "Trie-based algorithm assigned %d buffers to projects" trie-count))
+    
+    ;; Clean up the test buffers
+    (dolist (buffer buffers)
+      (kill-buffer buffer))))
+
+;; To run the benchmark:
+;; (benchmark-project-buffer-assignment)
