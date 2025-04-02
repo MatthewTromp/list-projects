@@ -1,35 +1,8 @@
 ;; TODO
-;; - Link to project root DONE
-;; - Include name as well as full path DONE
-;; - Currently open buffers? DONE (links to list of buffers in project)
-;; - Change default directory in a pre-command hook (so commands will
-;;    work relative to the project at point) DONE
-;; - Show VC (git/hg/whatever) DONE
-;; - Revert-buffer-hook or something (g should refresh the view) DONE
-;; - Have point stay on whatever we're currently on after a refresh DONE
-;; - Fix project menu showing up in buffer list for given project DONE
-;; - Correct project buffer count  DONE
-;; - Also fix project menu counting towards buffer count for the
-;;    project point is currently on when we revert DONE
-;; - Have other buffer open in different window and have point
-;;    automatically switch to that window for all things DONE
 ;; - Show current compilation status BLOCKED (I don't think that
 ;;    information is even stored?)
 ;; - Fix project menu showing up in buffer list when hitting c-x p c-b
 ;;    (list buffers) (might not be possible?)
-;; - Also fix project menu showing up in buffer list when hitting g in
-;;    buffer list DONE
-;; - Improve performance of project buffer counts (n = number of buffers,
-;;    p = number of projects. Currently O(np), should be O(n))
-;;    Hmmm but actually it's not that simple, because you could maybe
-;;    have nested projects. I think possibly the way you would have to
-;;    do this is with string tries?
-;;    It's also just not that simple cus you're looking for some item
-;;    which is a prefix of this item. I think you need string tries
-;;    for this no matter what??
-;;    Ignore nested projects: things are associated with the project
-;;    with the longest common prefix
-;; - Support arbitrary list of projects DONE
 ;; - Modify project.el to exclude the *Projects* buffer when listing
 ;;    buffers in a project
 
@@ -182,7 +155,6 @@ Returns a hash table mapping projects to lists of buffers."
                    project-buffers))))
     project-buffers))
 
-;; Modified function to use the precomputed buffer assignments
 (defun project-menu--print-info-simple (proj buffer-map)
   "Gets info for PROJ using BUFFER-MAP of precomputed buffer assignments."
   (let* ((buffers (seq-filter
@@ -233,7 +205,6 @@ Returns a hash table mapping projects to lists of buffers."
                  face project-vc
                  font-lock-face project-vc))])))
 
-;; Modified refresh function to use the optimized buffer assignment
 (defun project-menu--refresh ()
   "Populates the project menu with all known projects."
   (let* ((projects (funcall project-menu-refresh-fun))
@@ -409,5 +380,3 @@ a list of projects; it means list those projects and no others."
     (dolist (buffer buffers)
       (kill-buffer buffer))))
 
-;; To run the benchmark:
-;; (benchmark-project-buffer-assignment)
