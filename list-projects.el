@@ -1,3 +1,46 @@
+;;; list-projects.el -- Support for listing all the projects Emacs knows about -*- lexical-binding: t; -*-
+
+;; Version: 0.1.0
+;; Author: Matthew Tromp
+;; Url: https://github.com/MatthewTromp/list-projects
+
+;; Copyright (C) 2024-2025 Matthew Tromp
+
+;; This file is distributed under the terms of the GNU general public
+;; license v.3
+
+;; Commentary:
+
+;; List Projects provides an interactive tabulated list of all projects known to
+;; Emacs. It gives you a centralized view of your projects with useful information
+;; and actions.
+;;
+;; Features:
+;; - Shows project names, root directories, open buffer counts, and version control status
+;; - Fast buffer-to-project assignment using an efficient trie-based algorithm
+;; - Clickable items to:
+;;   - Open project roots in Dired
+;;   - List all buffers belonging to a project
+;;   - View version control status (with Magit integration for Git repositories)
+;; - Sets the default directory to the project at point for command context
+;;
+;; Usage:
+;; M-x list-projects         - Display the project list buffer
+;; In the project list buffer:
+;; - Click on a project name or root to open in Dired
+;; - Click on the buffer count to list project buffers
+;; - Click on the VC system to view version control status
+;; - Regular Emacs commands are executed in the context of the project at point
+;;
+;; You can customize the appearance via:
+;; - project-name-column-width
+;; - project-root-column-width
+;; - project-buffers-count-column-width
+;; - project-vc-column-width
+;;
+;; To use a different function for listing projects, set:
+;; - project-listing-function
+
 ;; TODO
 ;; - Show current compilation status BLOCKED (I don't think that
 ;;    information is even stored?)
@@ -6,9 +49,8 @@
 ;; - Modify project.el to exclude the *Projects* buffer when listing
 ;;    buffers in a project
 
-;; List projects keybinding C-x p l
-
 ;;; Code:
+
 (require 'project)
 
 (defface project-name
@@ -283,100 +325,3 @@ a list of projects; it means list those projects and no others."
 
 (provide 'list-projects)
 ;;; list-projects.el ends here
-
-
-(require 'benchmark)
-(require 'cl-lib)
-
-(defun generate-test-projects (n-projects)
-  "Generate N-PROJECTS test project objects."
-  (cl-loop for i from 1 to n-projects
-           collect (let ((project-root (format "/home/user/projects/project-%03d" i)))
-                     (cons 'transient project-root))))
-
-(defun generate-test-buffers (n-buffers projects)
-  "Generate N-BUFFERS test buffers distributed among PROJECTS."
-  (let* ((n-projects (length projects))
-         (buffers '()))
-    (dotimes (i n-buffers)
-      ;; Choose a random project
-      (let* ((project-idx (random n-projects))
-             (project (nth project-idx projects))
-             (project-root (cdr project))
-             ;; Create a buffer with default-directory in the project
-             (subdir (format "%s/src/module-%d" project-root (random 5)))
-             (buffer-name (format "buffer-%04d.el" i))
-             (buffer (generate-new-buffer buffer-name)))
-        ;; Set the buffer's default-directory
-        (with-current-buffer buffer
-          (setq default-directory (file-name-as-directory subdir)))
-        (push buffer buffers)))
-    buffers))
-
-(defun original-assign-buffers-to-projects (projects buffers)
-  "Assign BUFFERS to PROJECTS using the original O(N*P) algorithm."
-  (let ((project-buffers (make-hash-table :test 'equal)))
-    (dolist (buffer buffers)
-      (let ((buffer-dir (with-current-buffer buffer default-directory))
-            (matched-project nil))
-        ;; For each buffer, check all projects to find a match
-        (dolist (proj projects)
-          (let ((project-root (file-name-as-directory 
-                               (expand-file-name (cdr proj)))))
-            (when (string-prefix-p project-root buffer-dir)
-              (setq matched-project proj))))
-        (when matched-project
-          (puthash matched-project 
-                   (cons buffer (gethash matched-project project-buffers nil))
-                   project-buffers))))
-    project-buffers))
-
-(defun benchmark-project-buffer-assignment ()
-  "Benchmark the original vs trie-based project-buffer assignment algorithms."
-  (interactive)
-  ;; Generate test data
-  (let* ((n-projects 100)
-         (n-buffers 1000)
-         (projects (generate-test-projects n-projects))
-         (buffers (generate-test-buffers n-buffers projects))
-         (gc-cons-threshold most-positive-fixnum) ;; Prevent GC during benchmark
-         original-result
-         trie-result)
-    
-    (message "Starting benchmark with %d projects and %d buffers..." n-projects n-buffers)
-    
-    ;; Benchmark the original algorithm
-    (message "Benchmarking original algorithm...")
-    (let ((original-time
-           (benchmark-run 10
-             (setq original-result (original-assign-buffers-to-projects projects buffers)))))
-      (message "Original algorithm: %.6f seconds average (%.6f seconds total for 10 runs)"
-               (/ (car original-time) 10.0) (car original-time)))
-    
-    ;; Benchmark our trie-based algorithm
-    (message "Benchmarking trie-based algorithm...")
-    (let ((trie-time
-           (benchmark-run 10
-             (let ((trie (project-build-trie projects)))
-               (setq trie-result (make-hash-table :test 'equal))
-               (dolist (buffer buffers)
-                 (let ((project (project-for-buffer buffer trie)))
-                   (when project
-                     (puthash project 
-                              (cons buffer (gethash project trie-result nil))
-                              trie-result))))))))
-      (message "Trie-based algorithm: %.6f seconds average (%.6f seconds total for 10 runs)"
-               (/ (car trie-time) 10.0) (car trie-time)))
-    
-    ;; Check that the results are equivalent
-    (let ((original-count 0)
-          (trie-count 0))
-      (maphash (lambda (_k v) (cl-incf original-count (length v))) original-result)
-      (maphash (lambda (_k v) (cl-incf trie-count (length v))) trie-result)
-      (message "Original algorithm assigned %d buffers to projects" original-count)
-      (message "Trie-based algorithm assigned %d buffers to projects" trie-count))
-    
-    ;; Clean up the test buffers
-    (dolist (buffer buffers)
-      (kill-buffer buffer))))
-
