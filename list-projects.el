@@ -44,7 +44,7 @@
 ;; TODO
 ;; - Show current compilation status BLOCKED (I don't think that
 ;;    information is even stored?)
-;; - Fix project menu showing up in buffer list when hitting c-x p c-b
+;; - Fix project list showing up in buffer list when hitting c-x p c-b
 ;;    (list buffers) (might not be possible? requires changes to project.el?)
 
 ;;; Code:
@@ -53,12 +53,12 @@
 
 (defface list-projects-project-name
   '((t :inherit link))
-  "Face used on project names in the project menu."
+  "Face used on project names in the project list."
   :version "29.0")
 
 (defface list-projects-project-buffers-count
   '((t :inherit link))
-  "Face used on the buffer count in the project menu."
+  "Face used on the buffer count in the project list."
   :version "29.0")
 
 (defface list-projects-project-vc
@@ -71,25 +71,25 @@
   :group 'project)
 
 (defcustom list-projects-project-name-column-width 30
-  "Column width for the Project name in the project menu."
+  "Column width for the Project name in the project list."
   :type 'natnum
   :group 'project
   :version "29.0")
 
 (defcustom list-projects-project-root-column-width 40
-  "Column width for the Project root in the project menu."
+  "Column width for the Project root in the project list."
   :type 'natnum
   :group 'project
   :version "29.0")
 
 (defcustom list-projects-project-buffers-count-column-width 10
-  "Column width for the Project buffers count in the project menu."
+  "Column width for the Project buffers count in the project list."
   :type 'natnum
   :group 'project
   :version "29.0")
 
 (defcustom list-projects-project-vc-column-width 10
-  "Column width for the Project VC in the project menu."
+  "Column width for the Project VC in the project list."
   :type 'natnum
   :group 'project
   :version "29.0")
@@ -291,9 +291,9 @@ Returns a hash table mapping projects to lists of buffers."
                           (if p (list p) nil)))
             proj-roots)))
 
-(define-derived-mode list-projects-mode tabulated-list-mode "Project menu"
+(define-derived-mode list-projects-mode tabulated-list-mode "Project list"
   :interactive nil
-  ;; Set the default directory to whatever is at point
+  ;; Set the default directory to whatever project is on the current row
   (add-hook 'pre-command-hook 'list-projects--set-default-directory nil t)
   (setq tabulated-list-format
         `[("Project" ,list-projects-project-name-column-width t)
@@ -330,12 +330,12 @@ project."
       (setq list-projects--old-default-directory nil))))
 
 (defun list-projects ()
-  "Create a project menu buffer."
+  "Create and display a project list buffer."
   (interactive)
   (pop-to-buffer-same-window (list-projects-noselect)))
 
 (defun list-projects-noselect (&optional project-list-fun)
-  "Create a Project Menu buffer and return it.
+  "Create a project list buffer and return it.
 
 If PROJECT-LIST-FUN is non-nil, it should be a function that returns
 a list of projects; it means list those projects and no others."
