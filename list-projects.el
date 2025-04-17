@@ -117,16 +117,6 @@ A and B are the two rows to compare."
           (string< name-A name-B))
       (< dA dB))))
 
-(defun list-projects--ensure-project-menu-mode ()
-  "Signal a user-error if major mode is not `list-projects-mode'."
-  (unless (derived-mode-p 'list-projects-mode)
-    (user-error "The current buffer is not a Project Menu")))
-
-(defun list-projects--revert-hook (&optional _arg _noconfirm)
-  "Revert hook for `list-projects-mode'."
-  (list-projects--ensure-project-menu-mode)
-  (list-projects--refresh))
-
 (defun list-projects-jump-to-project (button)
   "Triggered when clicking/reting on a project name.
 Opens the project's root directory in `Dired'.
@@ -271,15 +261,13 @@ Returns a hash table mapping projects to lists of buffers."
                  face list-projects-project-vc
                  font-lock-face list-projects-project-vc))])))
 
-(defun list-projects--refresh ()
-  "Populate the projects list."
+(defun list-projects--entries ()
+  "Entries function for `list-projects-mode'."
   (let* ((projects (funcall list-projects-listing-function))
          (buffer-map (list-projects--group-buffers-by-project projects)))
-    (setq tabulated-list-entries
-          (mapcar (lambda (proj)
-                    (list-projects--print-info-simple proj buffer-map))
-                  projects)))
-  (tabulated-list-print t))
+    (mapcar (lambda (proj)
+              (list-projects--print-info-simple proj buffer-map))
+            projects)))
 
 
 (defun list-projects-known-projects ()
@@ -301,8 +289,8 @@ Returns a hash table mapping projects to lists of buffers."
           ("Buffers" ,list-projects-project-buffers-count-column-width list-projects--buffer-predicate)
           ("VC" ,list-projects-project-vc-column-width t)])
   (setq tabulated-list-padding 2)
-  (tabulated-list-init-header)
-  (add-hook 'tabulated-list-revert-hook 'list-projects--revert-hook nil t))
+  (setq tabulated-list-entries #'list-projects--entries)
+  (tabulated-list-init-header))
 
 (defvar-local list-projects--old-default-directory nil
   "The original `default-directory' before `list-projects--set-default-directory'.
@@ -345,7 +333,8 @@ a list of projects; it means list those projects and no others."
       (setq list-projects-listing-function
             (if project-list-fun
                 project-list-fun
-              list-projects-default-listing-function)))
+              list-projects-default-listing-function))
+      (revert-buffer))
     buf))
 
 (provide 'list-projects)
