@@ -2,7 +2,8 @@
 
 ;; Version: 0.1.0
 ;; Author: Matthew Tromp
-;; Url: https://github.com/MatthewTromp/list-projects
+;; Homepage: https://github.com/MatthewTromp/list-projects
+;; Package-Requires: ((emacs "28.1"))
 
 ;; Copyright (C) 2024-2025 Matthew Tromp
 
