@@ -134,6 +134,9 @@ BUTTON is what the user pressed."
          (default-directory "/")) ;; Set default directory to avoid the Packages buffer showing up in the list of buffers
     (select-window (project-list-buffers))))
 
+;; Avoids a warning when calling `magit-status'
+(declare-function magit-status "ext:magit" (directory))
+
 (defun list-projects--show-vc-state (button)
   "Triggered when clicking/reting on the VC system for a project.
 BUTTON is what the user pressed.
