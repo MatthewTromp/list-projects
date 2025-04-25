@@ -318,6 +318,7 @@ project."
       (setq default-directory list-projects--old-default-directory)
       (setq list-projects--old-default-directory nil))))
 
+;;;###autoload
 (defun list-projects ()
   "Create and display a project list buffer."
   (interactive)
