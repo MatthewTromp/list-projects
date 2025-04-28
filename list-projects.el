@@ -1,11 +1,12 @@
-;;; list-projects.el -- Support for listing all the projects Emacs knows about -*- lexical-binding: t; -*-
-
-;; Version: 0.1.0
-;; Author: Matthew Tromp
-;; Homepage: https://github.com/MatthewTromp/list-projects
-;; Package-Requires: ((emacs "28.1"))
+;;; list-projects.el --- List of known projects -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2024-2025 Matthew Tromp
+
+;; Version: 0.1.0
+;; Author: Matthew Tromp <matthewktromp@gmail.com>
+;; Homepage: https://github.com/MatthewTromp/list-projects
+;; Package-Requires: ((emacs "28.1"))
+;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;; This file is distributed under the terms of the GNU general public
 ;; license v.3
@@ -31,7 +32,7 @@
 ;; - Click on a project name or root to open in Dired
 ;; - Click on the buffer count to list project buffers
 ;; - Click on the VC system to view version control status
-;; - Regular Emacs commands are executed in the context of the project at point
+;; - Regular commands are executed in the context of the project at point
 ;;
 ;; You can customize the appearance via:
 ;; - list-projects-project-name-column-width
@@ -286,7 +287,7 @@ Returns a hash table mapping projects to lists of buffers."
 (define-derived-mode list-projects-mode tabulated-list-mode "Project list"
   :interactive nil
   ;; Set the default directory to whatever project is on the current row
-  (add-hook 'pre-command-hook 'list-projects--set-default-directory nil t)
+  (add-hook 'pre-command-hook #'list-projects--set-default-directory nil t)
   (setq tabulated-list-format
         `[("Project" ,list-projects-project-name-column-width t)
           ("Root" ,list-projects-project-root-column-width t)
